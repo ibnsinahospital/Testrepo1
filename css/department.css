@@ -1,0 +1,232 @@
+/* ==========================================================================
+   Ibn Sina Hospital — Department / Service-Area page styles
+   Loaded after style.css
+   ========================================================================== */
+
+/* 1. Breadcrumb (unscoped — used at page top level) */
+.breadcrumb-premium {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-4);
+  font-size: 0.85rem;
+  color: var(--sage-text);
+}
+.breadcrumb-premium a {
+  color: var(--forest);
+  font-weight: 500;
+}
+.breadcrumb-premium a:hover { text-decoration: underline; }
+.breadcrumb-premium span { color: var(--sage); font-size: 0.75rem; }
+
+/* 2. Section padding — used on all department / service-area pages */
+.section-padding { padding-block: clamp(3rem, 6vw, 5rem); }
+@media (max-width: 768px) {
+  .section-padding { padding-block: 2.5rem; }
+}
+
+/* 3. Hero subtitle — used inside .dept-hero and .hero-service-area */
+.subtitle {
+  font-size: clamp(1rem, 1.5vw, 1.15rem);
+  font-weight: 300;
+  line-height: var(--leading-relaxed);
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 62ch;
+  margin-bottom: var(--space-5);
+}
+@media (max-width: 640px) {
+  .subtitle {
+    text-align: center;
+    margin-inline: auto;
+  }
+}
+
+/* 4. Hero variants — assign by class on the section */
+.hero-dept {
+  background: var(--forest);
+}
+.hero-dept .trust-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.hero-dept .trust-badges span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Service-area hero variant */
+.hero-area {
+  background: linear-gradient(160deg, rgba(45, 74, 43, 0.94), rgba(29, 50, 28, 0.96));
+}
+
+/* 5. Doctor profile static page (rendered by generate.py) */
+.doctor-profile {
+  max-width: 820px;
+  margin-inline: auto;
+  padding-block: var(--space-6) var(--space-9);
+}
+.doctor-profile-header {
+  text-align: center;
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-6);
+}
+.doctor-profile-photo {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin: 0 auto var(--space-4);
+  border: 4px solid var(--white);
+  box-shadow: var(--shadow-md);
+  background: linear-gradient(135deg, #eaf1e6, #d4dfcd);
+}
+.doctor-profile h1 { margin-bottom: var(--space-2); }
+.doctor-profile-specialty {
+  display: inline-block;
+  padding: 0.3rem 1rem;
+  background: var(--olive);
+  color: var(--forest);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-3);
+}
+.doctor-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.doctor-profile-meta strong { color: var(--forest); }
+.doctor-profile-bio {
+  margin: var(--space-6) 0;
+  font-size: 1.05rem;
+  line-height: var(--leading-relaxed);
+  color: var(--muted);
+}
+.doctor-profile-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.related-doctors {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  background: var(--bg-alt);
+  border-radius: var(--radius);
+}
+.related-doctors strong { display: block; margin-bottom: var(--space-3); color: var(--forest); }
+.related-doctors ul { display: flex; flex-direction: column; gap: var(--space-2); }
+.related-doctors a { color: var(--forest); font-weight: 500; }
+.related-doctors a:hover { text-decoration: underline; }
+
+/* 6. Department directory pages */
+.directory-section { padding-block: var(--space-6); }
+.directory-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.directory-group h2 {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--line);
+  color: var(--forest);
+  font-size: 1.15rem;
+}
+.directory-group ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-3);
+}
+.directory-group li a {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--forest);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease),
+              transform var(--duration-fast) var(--ease);
+}
+.directory-group li a:hover {
+  background: var(--forest);
+  color: var(--ivory);
+  border-color: var(--forest);
+  transform: translateX(4px);
+}
+
+/* 7. NICU team note card */
+.team-note-card {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--bg-alt);
+  border-left: 4px solid var(--forest);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  line-height: var(--leading-relaxed);
+  color: var(--muted);
+  margin-top: var(--space-5);
+}
+.team-note-card svg {
+  flex-shrink: 0;
+  color: var(--forest);
+  width: 32px;
+  height: 32px;
+}
+.team-note-card p { margin: 0; }
+
+/* 8. "Also serving" internal links */
+.also-serving {
+  margin-top: var(--space-7);
+  padding: var(--space-5);
+  background: var(--bg-alt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.also-serving h3 {
+  font-size: 1rem;
+  margin-bottom: var(--space-3);
+  color: var(--forest);
+}
+.also-serving-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.also-serving-links a {
+  padding: 0.5rem 1.15rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--forest);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.also-serving-links a:hover {
+  background: var(--forest);
+  color: var(--ivory);
+  border-color: var(--forest);
+  }
