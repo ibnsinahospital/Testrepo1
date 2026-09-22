@@ -1,0 +1,70 @@
+name: Generate dynamic pages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'data/**'
+      - 'doctors/**'
+      - 'blog/**'
+      - 'department-pages/**'
+      - 'sitemap.xml'
+      - 'lastmod_cache.json'
+  schedule:
+    # Run daily at 06:00 IST (00:30 UTC)
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run generator
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: python generate.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add data/ doctors/ blog/ department-pages/ sitemap.xml lastmod_cache.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: regenerate dynamic pages [skip ci]"
+
+          # Retry push up to 3 times in case another run pushed first
+          for i in 1 2 3; do
+            if git push; then
+              echo "Push succeeded on attempt $i."
+              exit 0
+            fi
+            echo "Push failed — pulling latest and retrying."
+            git pull --rebase origin main || true
+            sleep 3
+          done
+
+          echo "Push failed after 3 attempts."
+          exit 1
