@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /_templates/
+Disallow: /lastmod_cache.json
+
+# Block AI scrapers (optional — remove lines below to allow)
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+
+Sitemap: https://ibnsinahospital.in/sitemap.xml
