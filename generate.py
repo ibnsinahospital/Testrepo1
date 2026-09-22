@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Ibn Sina Hospital — Static Site Generator
-Fetches data from Google Sheets, generates doctor pages, blog posts,
-department pages, and sitemap. Runs on GitHub Actions.
 """
 from __future__ import annotations
 
@@ -36,19 +34,10 @@ SHEETS = {
 }
 
 STATIC_TOP_LEVEL_PAGES = [
-    "",
-    "about.html",
-    "services.html",
-    "doctors.html",
-    "gallery.html",
-    "blog.html",
-    "careers.html",
-    "faq.html",
-    "contact.html",
-    "appointment.html",
-    "insurance-pmjay.html",
-    "health-checkup-packages.html",
-    "service-areas.html",
+    "", "about.html", "services.html", "doctors.html", "gallery.html",
+    "blog.html", "careers.html", "faq.html", "contact.html",
+    "appointment.html", "insurance-pmjay.html",
+    "health-checkup-packages.html", "service-areas.html",
 ]
 
 SERVICE_AREA_PAGES = [
@@ -100,12 +89,13 @@ def escape(value) -> str:
     return html.escape(str(value if value is not None else ""))
 
 
-def json_escape(value) -> str:
-    """Escape a string for embedding inside a JSON string literal."""
-    s = str(value if value is not None else "")
-    s = s.replace("\\", "\\\\").replace('"', '\\"')
-    s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
-    return s
+def jsonld_block(data) -> str:
+    """Serialize a Python dict/list to a <script type='application/ld+json'> tag."""
+    return (
+        '<script type="application/ld+json">'
+        + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        + "</script>"
+    )
 
 
 def fetch_csv(url: str):
@@ -149,8 +139,8 @@ def get_lastmod(url: str, content: str, cache: dict) -> str:
 # ============================================================
 # PARTIALS
 # ============================================================
-def partial_head(title: str, description: str, canonical: str, image: str = DEFAULT_IMAGE,
-                 is_article: bool = False, extra_jsonld: str = "", root: str = "") -> str:
+def partial_head(title, description, canonical, image=DEFAULT_IMAGE,
+                 is_article=False, extra_jsonld="", root=""):
     og_type = "article" if is_article else "website"
     return f'''<!DOCTYPE html>
 <html lang="en-IN">
@@ -201,8 +191,8 @@ gtag('js',new Date());gtag('config','G-SM7YH3P83K');
 '''
 
 
-def partial_header(active: str = "", root: str = "") -> str:
-    def link(href: str, label: str, key: str) -> str:
+def partial_header(active="", root=""):
+    def link(href, label, key):
         cls = "nav-link active" if active == key else "nav-link"
         aria = ' aria-current="page"' if active == key else ""
         return f'<li><a class="{cls}" href="{root}{href}"{aria}>{label}</a></li>'
@@ -245,22 +235,16 @@ def partial_header(active: str = "", root: str = "") -> str:
 '''
 
 
-def partial_footer(root: str = "") -> str:
+def partial_footer(root=""):
     return f'''<footer class="site-footer">
 <div class="container">
   <div class="footer-main">
     <div class="footer-col">
       <h3 class="footer-logo">Ibn Sina <strong>Hospital</strong></h3>
-      <address>
-        Near Railway Station, Ompora Railway Station Road,<br>
-        Ompora, Budgam, Jammu &amp; Kashmir 191111
-      </address>
+      <address>Near Railway Station, Ompora Railway Station Road,<br>Ompora, Budgam, Jammu &amp; Kashmir 191111</address>
       <p><a href="tel:+919622552553">📞 9622552553 / 9419023501</a></p>
       <p><a href="mailto:weibnsina@gmail.com">✉ weibnsina@gmail.com</a></p>
-      <p class="footer-service-areas">
-        <strong>Service Areas:</strong> Budgam, Srinagar, Ompora, Ganderbal,
-        Pulwama, Shopian, Kulgam — across <strong>Jammu &amp; Kashmir</strong>
-      </p>
+      <p class="footer-service-areas"><strong>Service Areas:</strong> Budgam, Srinagar, Ompora, Ganderbal, Pulwama, Shopian, Kulgam — across <strong>Jammu &amp; Kashmir</strong></p>
     </div>
     <div class="footer-col">
       <h4>Quick Links</h4>
@@ -296,7 +280,7 @@ def partial_footer(root: str = "") -> str:
 '''
 
 
-def partial_scripts(root: str = "") -> str:
+def partial_scripts(root=""):
     return f'''<a href="https://wa.me/919622552553" class="floating-whatsapp" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
   <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
@@ -678,65 +662,58 @@ DEPARTMENT_CONTENT = {
 # ============================================================
 # PAGE BUILDERS
 # ============================================================
-def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
+def build_department_page(slug, data, doctors_for_dept):
     title = f"{data['title']} in Budgam | Ibn Sina Hospital"
     description = data["subtitle"]
     canonical = f"{SITE_URL}/department-pages/{slug}.html"
 
-    # Build FAQ items as JSON objects — plain string concat to avoid
-    # Python 3.11's f-string bracket restrictions.
-    faq_items = []
-    for q, a in data["faqs"]:
-        faq_items.append(
-            '{"@type": "Question", '
-            f'"name": "{json_escape(q)}", '
-            '"acceptedAnswer": {"@type": "Answer", '
-            f'"text": "{json_escape(a)}"}}'
-        )
-    faq_json = "[" + ", ".join(faq_items) + "]"
+    jsonld_data = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "MedicalClinic",
+                "name": f"Ibn Sina Hospital — {data['title']}",
+                "url": canonical,
+                "medicalSpecialty": data["title"],
+                "address": {
+                    "@type": "PostalAddress",
+                    "streetAddress": "Near Railway Station, Ompora Railway Station Road, Ompora",
+                    "addressLocality": "Budgam",
+                    "addressRegion": "Jammu and Kashmir",
+                    "postalCode": "191111",
+                    "addressCountry": "IN",
+                },
+                "telephone": "+919622552553",
+            },
+            {
+                "@type": "FAQPage",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": q,
+                        "acceptedAnswer": {"@type": "Answer", "text": a},
+                    }
+                    for q, a in data["faqs"]
+                ],
+            },
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{SITE_URL}/"},
+                    {"@type": "ListItem", "position": 2, "name": "Departments", "item": f"{SITE_URL}/services.html"},
+                    {"@type": "ListItem", "position": 3, "name": data["title"], "item": canonical},
+                ],
+            },
+        ],
+    }
 
-    jsonld = f'''<script type="application/ld+json">
-{{
-  "@context": "https://schema.org",
-  "@graph": [
-    {{
-      "@type": "MedicalClinic",
-      "name": "Ibn Sina Hospital — {json_escape(data['title'])}",
-      "url": "{canonical}",
-      "medicalSpecialty": "{json_escape(data['title'])}",
-      "address": {{
-        "@type": "PostalAddress",
-        "streetAddress": "Near Railway Station, Ompora Railway Station Road, Ompora",
-        "addressLocality": "Budgam",
-        "addressRegion": "Jammu and Kashmir",
-        "postalCode": "191111",
-        "addressCountry": "IN"
-      }},
-      "telephone": "+919622552553"
-    }},
-    {{
-      "@type": "FAQPage",
-      "mainEntity": {faq_json}
-    }},
-    {{
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {{"@type": "ListItem", "position": 1, "name": "Home", "item": "{SITE_URL}/"}},
-        {{"@type": "ListItem", "position": 2, "name": "Departments", "item": "{SITE_URL}/services.html"}},
-        {{"@type": "ListItem", "position": 3, "name": "{json_escape(data['title'])}", "item": "{canonical}"}}
-      ]
-    }}
-  ]
-}}
-</script>'''
-
-    head = partial_head(title, description, canonical, extra_jsonld=jsonld, root="../")
+    head = partial_head(title, description, canonical, extra_jsonld=jsonld_block(jsonld_data), root="../")
     header = partial_header(active="services", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
 
     treats = "".join(f'<div class="treat-item">{escape(t)}</div>' for t in data["treat"])
-    facilities = "".join(f'<li>{escape(f)}</li>' for f in data["facilities"])
+    facilities = "".join(f"<li>{escape(f)}</li>" for f in data["facilities"])
 
     doctors_html = ""
     if doctors_for_dept:
@@ -745,22 +722,27 @@ def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
             name = clean_name(d.get("name", ""))
             slug_d = "doctor-" + slugify(d.get("name", ""))
             photo = d.get("photo_url") or ""
-            img = (f'<img class="doctor-card-img" src="{escape(photo)}" alt="{escape(name)}" loading="lazy" width="96" height="96">'
-                   if photo else '<div class="doctor-card-placeholder">👨‍⚕️</div>')
-            cards.append(f'''<a class="doctor-card" href="../doctors/{slug_d}.html">
-              {img}
-              <h3>{escape(name)}</h3>
-              <p class="doctor-card-specialty">{escape(title_case(d.get("specialty", "")))}</p>
-              <p class="doctor-card-qual">{escape(d.get("qualifications", ""))}</p>
-              <span class="btn btn-outline btn-sm">View Profile</span>
-            </a>''')
-        doctors_html = f'''
-        <section class="section-padding section-flush-top">
-          <div class="container">
-            <h2 class="section-title">Our {escape(data["title"])} Team</h2>
-            <div class="doctor-cards-grid">{"".join(cards)}</div>
-          </div>
-        </section>'''
+            img = (
+                f'<img class="doctor-card-img" src="{escape(photo)}" alt="{escape(name)}" loading="lazy" width="96" height="96">'
+                if photo
+                else '<div class="doctor-card-placeholder">👨‍⚕️</div>'
+            )
+            cards.append(
+                f'<a class="doctor-card" href="../doctors/{slug_d}.html">'
+                f"{img}"
+                f"<h3>{escape(name)}</h3>"
+                f'<p class="doctor-card-specialty">{escape(title_case(d.get("specialty", "")))}</p>'
+                f'<p class="doctor-card-qual">{escape(d.get("qualifications", ""))}</p>'
+                f'<span class="btn btn-outline btn-sm">View Profile</span>'
+                f"</a>"
+            )
+        doctors_html = (
+            '<section class="section-padding section-flush-top">'
+            '<div class="container">'
+            f'<h2 class="section-title">Our {escape(data["title"])} Team</h2>'
+            f'<div class="doctor-cards-grid">{"".join(cards)}</div>'
+            "</div></section>"
+        )
 
     faqs_html = "".join(
         f'<details class="faq-item"><summary>{escape(q)}</summary><div class="faq-answer">{escape(a)}</div></details>'
@@ -769,109 +751,115 @@ def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
 
     team_note = ""
     if data.get("team_note"):
-        team_note = f'<div class="team-note-card"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg><p>{escape(data["team_note"])}</p></div>'
+        team_note = (
+            '<div class="team-note-card">'
+            '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
+            '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>'
+            f'<p>{escape(data["team_note"])}</p>'
+            "</div>"
+        )
 
-    return f'''{head}
+    return f"""{head}
 {header}
 <main id="main-content">
 
-  <nav class="breadcrumb-premium container" aria-label="Breadcrumb">
-    <a href="../index.html">Home</a><span>›</span>
-    <a href="../services.html">Departments</a><span>›</span>
-    <span>{escape(data["title"])}</span>
-  </nav>
+<nav class="breadcrumb-premium container" aria-label="Breadcrumb">
+  <a href="../index.html">Home</a><span>›</span>
+  <a href="../services.html">Departments</a><span>›</span>
+  <span>{escape(data["title"])}</span>
+</nav>
 
-  <section class="dept-hero">
-    <div class="container">
-      <h1>{escape(data["title"])}</h1>
-      <p class="subtitle">{escape(data["subtitle"])}</p>
-      <div class="hero-ctas">
-        <a href="../appointment.html?dept={slug}" class="btn btn-primary">Book Appointment</a>
-        <a href="https://wa.me/919622552553" class="btn btn-emergency" target="_blank" rel="noopener">WhatsApp</a>
-        <a href="tel:+919622552553" class="btn btn-outline-light">Call 9622552553</a>
-      </div>
-      <div class="trust-badges">
-        <span>🕐 24/7 OPD &amp; Emergency</span>
-        <span>👨‍⚕️ Consultant-Led Care</span>
-        <span>💳 PM-JAY / Insurance</span>
-      </div>
+<section class="dept-hero">
+  <div class="container">
+    <h1>{escape(data["title"])}</h1>
+    <p class="subtitle">{escape(data["subtitle"])}</p>
+    <div class="hero-ctas">
+      <a href="../appointment.html?dept={slug}" class="btn btn-primary">Book Appointment</a>
+      <a href="https://wa.me/919622552553" class="btn btn-emergency" target="_blank" rel="noopener">WhatsApp</a>
+      <a href="tel:+919622552553" class="btn btn-outline-light">Call 9622552553</a>
     </div>
-  </section>
-
-  <section class="section-padding">
-    <div class="container">
-      <h2 class="section-title">What We Treat</h2>
-      <div class="treat-grid">{treats}</div>
-      <p class="treat-note">Consultant-led care for patients from Budgam, Srinagar, Ganderbal, and across Jammu &amp; Kashmir.</p>
+    <div class="trust-badges">
+      <span>🕐 24/7 OPD &amp; Emergency</span>
+      <span>👨‍⚕️ Consultant-Led Care</span>
+      <span>💳 PM-JAY / Insurance</span>
     </div>
-  </section>
+  </div>
+</section>
 
-  {doctors_html}
+<section class="section-padding">
+  <div class="container">
+    <h2 class="section-title">What We Treat</h2>
+    <div class="treat-grid">{treats}</div>
+    <p class="treat-note">Consultant-led care for patients from Budgam, Srinagar, Ganderbal, and across Jammu &amp; Kashmir.</p>
+  </div>
+</section>
 
-  <section class="section-padding" style="background:var(--bg-alt)">
-    <div class="container">
-      <h2 class="section-title">Our Facilities</h2>
-      <ul class="facilities-list">{facilities}</ul>
-      {team_note}
+{doctors_html}
+
+<section class="section-padding" style="background:var(--bg-alt)">
+  <div class="container">
+    <h2 class="section-title">Our Facilities</h2>
+    <ul class="facilities-list">{facilities}</ul>
+    {team_note}
+  </div>
+</section>
+
+<section class="section-padding">
+  <div class="container">
+    <h2 class="section-title">Why Ibn Sina Hospital</h2>
+    <div class="why-grid">
+      <div class="why-card"><div class="why-card-icon">🕐</div><h3>24/7 OPD &amp; Emergency</h3><p>Round-the-clock outpatient and emergency services.</p></div>
+      <div class="why-card"><div class="why-card-icon">👨‍⚕️</div><h3>Consultant-Led Care</h3><p>Experienced consultants guide every case.</p></div>
+      <div class="why-card"><div class="why-card-icon">💳</div><h3>PM-JAY &amp; Insurance</h3><p>Cashless treatment for eligible families.</p></div>
+      <div class="why-card"><div class="why-card-icon">📍</div><h3>Accessible Location</h3><p>Ompora, Budgam — near the railway station.</p></div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <section class="section-padding">
-    <div class="container">
-      <h2 class="section-title">Why Ibn Sina Hospital</h2>
-      <div class="why-grid">
-        <div class="why-card"><div class="why-card-icon">🕐</div><h3>24/7 OPD &amp; Emergency</h3><p>Round-the-clock outpatient and emergency services.</p></div>
-        <div class="why-card"><div class="why-card-icon">👨‍⚕️</div><h3>Consultant-Led Care</h3><p>Experienced consultants guide every case.</p></div>
-        <div class="why-card"><div class="why-card-icon">💳</div><h3>PM-JAY &amp; Insurance</h3><p>Cashless treatment for eligible families.</p></div>
-        <div class="why-card"><div class="why-card-icon">📍</div><h3>Accessible Location</h3><p>Ompora, Budgam — near the railway station.</p></div>
-      </div>
-    </div>
-  </section>
+<section class="section-padding" style="background:var(--bg-alt)">
+  <div class="container">
+    <h2 class="section-title">Frequently Asked Questions</h2>
+    <div class="faq-list">{faqs_html}</div>
+  </div>
+</section>
 
-  <section class="section-padding" style="background:var(--bg-alt)">
-    <div class="container">
-      <h2 class="section-title">Frequently Asked Questions</h2>
-      <div class="faq-list">{faqs_html}</div>
-    </div>
-  </section>
-
-  <section class="section-padding">
-    <div class="container">
-      <div class="also-serving">
-        <h3>Also serving</h3>
-        <div class="also-serving-links">
-          <a href="../service-areas/hospital-in-srinagar.html">Srinagar patients</a>
-          <a href="../service-areas/hospital-in-ganderbal.html">Ganderbal patients</a>
-          <a href="../service-areas/hospital-near-chadoora-beerwah-charar.html">Chadoora, Beerwah &amp; Charar-i-Sharief</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="cta-banner">
-    <div class="container cta-banner-inner">
-      <div>
-        <h2>Ready to book your visit?</h2>
-        <p>Call us directly or book online. Our team will confirm within a few hours.</p>
-        <div class="cta-banner-buttons">
-          <a href="../appointment.html?dept={slug}" class="btn btn-primary btn-lg">Book Appointment</a>
-          <a href="../contact.html" class="btn btn-outline-light btn-lg">Contact Us</a>
-        </div>
-      </div>
-      <div class="emergency-callout">
-        <strong>Emergency</strong>
-        <a href="tel:9622552553">9622552553</a>
-        <span>Available 24/7, 365 days</span>
+<section class="section-padding">
+  <div class="container">
+    <div class="also-serving">
+      <h3>Also serving</h3>
+      <div class="also-serving-links">
+        <a href="../service-areas/hospital-in-srinagar.html">Srinagar patients</a>
+        <a href="../service-areas/hospital-in-ganderbal.html">Ganderbal patients</a>
+        <a href="../service-areas/hospital-near-chadoora-beerwah-charar.html">Chadoora, Beerwah &amp; Charar-i-Sharief</a>
       </div>
     </div>
-  </section>
+  </div>
+</section>
+
+<section class="cta-banner">
+  <div class="container cta-banner-inner">
+    <div>
+      <h2>Ready to book your visit?</h2>
+      <p>Call us directly or book online. Our team will confirm within a few hours.</p>
+      <div class="cta-banner-buttons">
+        <a href="../appointment.html?dept={slug}" class="btn btn-primary btn-lg">Book Appointment</a>
+        <a href="../contact.html" class="btn btn-outline-light btn-lg">Contact Us</a>
+      </div>
+    </div>
+    <div class="emergency-callout">
+      <strong>Emergency</strong>
+      <a href="tel:9622552553">9622552553</a>
+      <span>Available 24/7, 365 days</span>
+    </div>
+  </div>
+</section>
 
 </main>
 {footer}
-{scripts}'''
+{scripts}"""
 
 
-def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
+def build_doctor_page(doc, dept, related):
     name = clean_name(doc.get("name", ""))
     slug = "doctor-" + slugify(doc.get("name", ""))
     filename = f"{slug}.html"
@@ -883,50 +871,57 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
     about = doc.get("about", "")
 
     title = f"{name} — {specialty} in Budgam | Ibn Sina Hospital"
-    description = (f"{name} is a {specialty} at Ibn Sina Hospital, Budgam. "
-                   f"View profile, qualifications, and book an appointment.")
+    description = f"{name} is a {specialty} at Ibn Sina Hospital, Budgam. View profile, qualifications, and book an appointment."
 
-    jsonld = f'''<script type="application/ld+json">
-{{
-  "@context": "https://schema.org",
-  "@graph": [
-    {{
-      "@type": "Physician",
-      "name": "{json_escape(name)}",
-      "medicalSpecialty": "{json_escape(specialty)}",
-      "url": "{url}",
-      {"\"image\": \"" + json_escape(photo) + "\"," if photo else ""}
-      "worksFor": {{
-        "@type": "Hospital",
-        "name": "Ibn Sina Hospital",
-        "address": {{
-          "@type": "PostalAddress",
-          "addressLocality": "Budgam",
-          "addressRegion": "Jammu and Kashmir",
-          "addressCountry": "IN"
-        }}
-      }}
-    }},
-    {{
-      "@type": "BreadcrumbList",
-      "itemListElement": [
-        {{"@type": "ListItem", "position": 1, "name": "Home", "item": "{SITE_URL}/"}},
-        {{"@type": "ListItem", "position": 2, "name": "Doctors", "item": "{SITE_URL}/doctors.html"}},
-        {{"@type": "ListItem", "position": 3, "name": "{json_escape(name)}", "item": "{url}"}}
-      ]
-    }}
-  ]
-}}
-</script>'''
+    physician = {
+        "@type": "Physician",
+        "name": name,
+        "medicalSpecialty": specialty,
+        "url": url,
+        "worksFor": {
+            "@type": "Hospital",
+            "name": "Ibn Sina Hospital",
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": "Budgam",
+                "addressRegion": "Jammu and Kashmir",
+                "addressCountry": "IN",
+            },
+        },
+    }
+    if photo:
+        physician["image"] = photo
 
-    head = partial_head(title, description, url, image=photo or DEFAULT_IMAGE,
-                        extra_jsonld=jsonld, root="../")
+    jsonld_data = {
+        "@context": "https://schema.org",
+        "@graph": [
+            physician,
+            {
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Home", "item": f"{SITE_URL}/"},
+                    {"@type": "ListItem", "position": 2, "name": "Doctors", "item": f"{SITE_URL}/doctors.html"},
+                    {"@type": "ListItem", "position": 3, "name": name, "item": url},
+                ],
+            },
+        ],
+    }
+
+    head = partial_head(
+        title, description, url,
+        image=photo or DEFAULT_IMAGE,
+        extra_jsonld=jsonld_block(jsonld_data),
+        root="../",
+    )
     header = partial_header(active="doctors", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
 
-    photo_html = (f'<img class="doctor-profile-photo" src="{escape(photo)}" alt="{escape(name)} — {escape(specialty)}" width="140" height="140">'
-                  if photo else '<div class="doctor-profile-photo doctor-card-placeholder" aria-hidden="true">👨‍⚕️</div>')
+    photo_html = (
+        f'<img class="doctor-profile-photo" src="{escape(photo)}" alt="{escape(name)} — {escape(specialty)}" width="140" height="140">'
+        if photo
+        else '<div class="doctor-profile-photo doctor-card-placeholder" aria-hidden="true">👨‍⚕️</div>'
+    )
 
     dept_link = ""
     if dept:
@@ -940,7 +935,7 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
         )
         related_html = f'<div class="related-doctors"><strong>Other {escape(department)} Specialists</strong><ul>{items}</ul></div>'
 
-    return filename, url, f'''{head}
+    return filename, url, f"""{head}
 {header}
 <main id="main-content">
   <nav class="breadcrumb-premium container" aria-label="Breadcrumb">
@@ -972,10 +967,10 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
   </article>
 </main>
 {footer}
-{scripts}'''
+{scripts}"""
 
 
-def build_blog_post(post: dict, related: list) -> tuple:
+def build_blog_post(post, related):
     slug = post.get("slug") or slugify(post.get("title", ""))
     filename = f"blog-{slug}.html"
     url = f"{SITE_URL}/blog/{filename}"
@@ -987,7 +982,6 @@ def build_blog_post(post: dict, related: list) -> tuple:
     category = post.get("category", "Health")
     reading = max(1, math.ceil(len(re.sub(r"<[^>]+>", " ", body).split()) / 200))
 
-    # Rewrite internal links from /blog/
     body = re.sub(r'href="appointment\.html"', 'href="../appointment.html"', body)
     body = re.sub(r'href="insurance-pmjay\.html"', 'href="../insurance-pmjay.html"', body)
     body = re.sub(r'href="services\.html"', 'href="../services.html"', body)
@@ -1012,32 +1006,34 @@ def build_blog_post(post: dict, related: list) -> tuple:
 
     formatted_date = format_date(published)
 
-    jsonld = f'''<script type="application/ld+json">
-{{
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": "{json_escape(title)}",
-  "description": "{json_escape(summary[:160])}",
-  "image": "{json_escape(image)}",
-  "datePublished": "{json_escape(published)}",
-  "dateModified": "{json_escape(published)}",
-  "author": {{"@type": "Organization", "name": "Ibn Sina Hospital", "url": "{SITE_URL}/"}},
-  "publisher": {{
-    "@type": "Organization",
-    "name": "Ibn Sina Hospital",
-    "logo": {{"@type": "ImageObject", "url": "{FAVICON}"}}
-  }},
-  "mainEntityOfPage": {{"@type": "WebPage", "@id": "{url}"}}
-}}
-</script>'''
+    jsonld_data = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": title,
+        "description": summary[:160],
+        "image": image,
+        "datePublished": published,
+        "dateModified": published,
+        "author": {"@type": "Organization", "name": "Ibn Sina Hospital", "url": f"{SITE_URL}/"},
+        "publisher": {
+            "@type": "Organization",
+            "name": "Ibn Sina Hospital",
+            "logo": {"@type": "ImageObject", "url": FAVICON},
+        },
+        "mainEntityOfPage": {"@type": "WebPage", "@id": url},
+    }
 
-    head = partial_head(title, summary[:160], url, image=image, is_article=True,
-                        extra_jsonld=jsonld, root="../")
+    head = partial_head(
+        title, summary[:160], url,
+        image=image, is_article=True,
+        extra_jsonld=jsonld_block(jsonld_data),
+        root="../",
+    )
     header = partial_header(active="blog", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
 
-    return filename, url, f'''{head}
+    return filename, url, f"""{head}
 {header}
 <main id="main-content">
   <nav class="breadcrumb-premium container" aria-label="Breadcrumb">
@@ -1082,10 +1078,10 @@ def build_blog_post(post: dict, related: list) -> tuple:
   </article>
 </main>
 {footer}
-{scripts}'''
+{scripts}"""
 
 
-def format_blog_body(text: str) -> str:
+def format_blog_body(text):
     text = re.sub(r"[\u200B-\u200D\u2060\uFEFF]", "", text)
     blocks = re.split(r"\n\s*\n", text)
     out = []
@@ -1112,18 +1108,18 @@ def format_blog_body(text: str) -> str:
             elif wc <= 8 and not re.search(r"[.!?:;,]$", line) and re.match(r"^[A-Z]", line):
                 out.append(f'<h3 class="blog-subheading">{html.escape(line)}</h3>')
             else:
-                cls = " class=\"blog-lead-paragraph\"" if not lead_assigned else ""
+                cls = ' class="blog-lead-paragraph"' if not lead_assigned else ""
                 lead_assigned = True
                 out.append(f"<p{cls}>{html.escape(line)}</p>")
         else:
-            cls = " class=\"blog-lead-paragraph\"" if not lead_assigned else ""
+            cls = ' class="blog-lead-paragraph"' if not lead_assigned else ""
             lead_assigned = True
             out.append(f"<p{cls}>" + "<br>".join(html.escape(l) for l in lines) + "</p>")
 
     return "".join(out)
 
 
-def format_date(value: str) -> str:
+def format_date(value):
     if not value:
         return ""
     for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
@@ -1146,7 +1142,6 @@ def main():
     gallery_raw = fetch_csv(SHEETS["gallery"])
     updates_raw = fetch_csv(SHEETS["updates"])
 
-    # Normalize blog short summary field name (sheet uses "short summary" with a space)
     for post in blog_raw:
         if "short summary" in post and not post.get("short_summary"):
             post["short_summary"] = post.pop("short summary")
@@ -1184,7 +1179,7 @@ def main():
     print("[3/6] Generating doctor profile pages…")
     Path("doctors").mkdir(exist_ok=True)
     doctor_urls = []
-    for i, doc in enumerate(doctors_raw):
+    for doc in doctors_raw:
         dept_slug = slugify(doc.get("department", ""))
         dept_meta = departments_by_slug.get(dept_slug, {"slug": dept_slug, "name": doc.get("department", "")})
         related = [
@@ -1200,7 +1195,10 @@ def main():
     print("[4/6] Generating blog posts…")
     Path("blog").mkdir(exist_ok=True)
     blog_urls = []
-    published_posts = [p for p in blog_raw if str(p.get("is_published", "")).lower().strip() in ("true", "yes", "1", "y")]
+    published_posts = [
+        p for p in blog_raw
+        if str(p.get("is_published", "")).lower().strip() in ("true", "yes", "1", "y")
+    ]
     for post in published_posts:
         related = [p for p in published_posts if p.get("slug") != post.get("slug")][:3]
         filename, url, html_out = build_blog_post(post, related)
@@ -1210,10 +1208,8 @@ def main():
 
     print("[5/6] Building sitemap…")
     cache = load_lastmod_cache()
-
     static_pages = [f"{SITE_URL}/{p}" if p else f"{SITE_URL}/" for p in STATIC_TOP_LEVEL_PAGES]
     service_area_urls = [f"{SITE_URL}/{p}" for p in SERVICE_AREA_PAGES]
-
     directory_pages = [
         f"{SITE_URL}/department-pages/specialties-directory.html",
         f"{SITE_URL}/department-pages/doctor-directory.html",
@@ -1221,17 +1217,13 @@ def main():
     ]
 
     all_urls = list(set(
-        static_pages
-        + service_area_urls
-        + dept_urls
-        + doctor_urls
-        + blog_urls
-        + directory_pages
+        static_pages + service_area_urls + dept_urls + doctor_urls + blog_urls + directory_pages
     ))
 
-    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-
+    xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
     for url in sorted(all_urls):
         if url == f"{SITE_URL}/":
             priority = "1.0"
@@ -1240,9 +1232,10 @@ def main():
         else:
             priority = "0.7"
         lastmod = cache.get(url, {}).get("lastmod", TODAY)
-        xml.append(f"  <url><loc>{url}</loc><lastmod>{lastmod}</lastmod>"
-                   f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>")
-
+        xml.append(
+            f"  <url><loc>{url}</loc><lastmod>{lastmod}</lastmod>"
+            f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>"
+        )
     xml.append("</urlset>")
     Path("sitemap.xml").write_text("\n".join(xml), encoding="utf-8")
     print(f"  → {len(all_urls)} URLs in sitemap")
