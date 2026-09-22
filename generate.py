@@ -36,7 +36,7 @@ SHEETS = {
 }
 
 STATIC_TOP_LEVEL_PAGES = [
-    "",  # homepage
+    "",
     "about.html",
     "services.html",
     "doctors.html",
@@ -49,6 +49,24 @@ STATIC_TOP_LEVEL_PAGES = [
     "insurance-pmjay.html",
     "health-checkup-packages.html",
     "service-areas.html",
+]
+
+SERVICE_AREA_PAGES = [
+    "service-areas/hospital-in-budgam.html",
+    "service-areas/hospital-in-srinagar.html",
+    "service-areas/hospital-in-ganderbal.html",
+    "service-areas/hospital-in-pulwama.html",
+    "service-areas/hospital-in-baramulla.html",
+    "service-areas/hospital-in-anantnag.html",
+    "service-areas/hospital-in-shopian.html",
+    "service-areas/hospital-in-kulgam.html",
+    "service-areas/hospital-in-kupwara.html",
+    "service-areas/hospital-in-bandipora.html",
+    "service-areas/hospital-near-chadoora-beerwah-charar.html",
+    "service-areas/hospital-near-ompora-railway-station.html",
+    "service-areas/emergency-hospital-budgam.html",
+    "service-areas/dialysis-hospital-budgam.html",
+    "service-areas/pmjay-hospital-kashmir.html",
 ]
 
 LASTMOD_CACHE = Path("lastmod_cache.json")
@@ -82,12 +100,19 @@ def escape(value) -> str:
     return html.escape(str(value if value is not None else ""))
 
 
+def json_escape(value) -> str:
+    """Escape a string for embedding inside a JSON string literal."""
+    s = str(value if value is not None else "")
+    s = s.replace("\\", "\\\\").replace('"', '\\"')
+    s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    return s
+
+
 def fetch_csv(url: str):
     req = urllib.request.Request(url, headers={"User-Agent": "IbnSina-SSG/3.0"})
     with urllib.request.urlopen(req, timeout=30) as response:
         content = response.read().decode("utf-8")
     rows = list(csv.DictReader(io.StringIO(content)))
-    # Trim all string values
     for row in rows:
         for k, v in list(row.items()):
             if isinstance(v, str):
@@ -122,10 +147,10 @@ def get_lastmod(url: str, content: str, cache: dict) -> str:
 
 
 # ============================================================
-# PARTIALS — shared HTML chunks
+# PARTIALS
 # ============================================================
 def partial_head(title: str, description: str, canonical: str, image: str = DEFAULT_IMAGE,
-                 is_article: bool = False, extra_jsonld: str = "") -> str:
+                 is_article: bool = False, extra_jsonld: str = "", root: str = "") -> str:
     og_type = "article" if is_article else "website"
     return f'''<!DOCTYPE html>
 <html lang="en-IN">
@@ -146,8 +171,8 @@ def partial_head(title: str, description: str, canonical: str, image: str = DEFA
 <link rel="preconnect" href="https://i.ibb.co" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="{{CSS_PATH}}style.css">
-<link rel="stylesheet" href="{{CSS_PATH}}department.css">
+<link rel="stylesheet" href="{root}css/style.css">
+<link rel="stylesheet" href="{root}css/department.css">
 
 <meta property="og:type" content="{og_type}">
 <meta property="og:site_name" content="Ibn Sina Hospital">
@@ -282,7 +307,7 @@ def partial_scripts(root: str = "") -> str:
 
 
 # ============================================================
-# DEPARTMENT DATA (source of truth for department pages)
+# DEPARTMENT CONTENT
 # ============================================================
 DEPARTMENT_CONTENT = {
     "cardiology": {
@@ -654,10 +679,21 @@ DEPARTMENT_CONTENT = {
 # PAGE BUILDERS
 # ============================================================
 def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
-    """Generate a complete department page."""
     title = f"{data['title']} in Budgam | Ibn Sina Hospital"
     description = data["subtitle"]
     canonical = f"{SITE_URL}/department-pages/{slug}.html"
+
+    # Build FAQ items as JSON objects — plain string concat to avoid
+    # Python 3.11's f-string bracket restrictions.
+    faq_items = []
+    for q, a in data["faqs"]:
+        faq_items.append(
+            '{"@type": "Question", '
+            f'"name": "{json_escape(q)}", '
+            '"acceptedAnswer": {"@type": "Answer", '
+            f'"text": "{json_escape(a)}"}}'
+        )
+    faq_json = "[" + ", ".join(faq_items) + "]"
 
     jsonld = f'''<script type="application/ld+json">
 {{
@@ -665,9 +701,9 @@ def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
   "@graph": [
     {{
       "@type": "MedicalClinic",
-      "name": "Ibn Sina Hospital — {escape(data['title'])}",
+      "name": "Ibn Sina Hospital — {json_escape(data['title'])}",
       "url": "{canonical}",
-      "medicalSpecialty": "{escape(data['title'])}",
+      "medicalSpecialty": "{json_escape(data['title'])}",
       "address": {{
         "@type": "PostalAddress",
         "streetAddress": "Near Railway Station, Ompora Railway Station Road, Ompora",
@@ -680,25 +716,21 @@ def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
     }},
     {{
       "@type": "FAQPage",
-      "mainEntity": [{",".join([f'''{{
-        "@type": "Question",
-        "name": "{escape(q)}",
-        "acceptedAnswer": {{"@type": "Answer", "text": "{escape(a)}"}}
-      }}''' for q, a in data["faqs"]])}]
+      "mainEntity": {faq_json}
     }},
     {{
       "@type": "BreadcrumbList",
       "itemListElement": [
         {{"@type": "ListItem", "position": 1, "name": "Home", "item": "{SITE_URL}/"}},
         {{"@type": "ListItem", "position": 2, "name": "Departments", "item": "{SITE_URL}/services.html"}},
-        {{"@type": "ListItem", "position": 3, "name": "{escape(data['title'])}", "item": "{canonical}"}}
+        {{"@type": "ListItem", "position": 3, "name": "{json_escape(data['title'])}", "item": "{canonical}"}}
       ]
     }}
   ]
 }}
 </script>'''
 
-    head = partial_head(title, description, canonical, extra_jsonld=jsonld).replace("{CSS_PATH}", "../")
+    head = partial_head(title, description, canonical, extra_jsonld=jsonld, root="../")
     header = partial_header(active="services", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
@@ -840,7 +872,6 @@ def build_department_page(slug: str, data: dict, doctors_for_dept: list) -> str:
 
 
 def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
-    """Generate a doctor profile page. Returns (path, url, html)."""
     name = clean_name(doc.get("name", ""))
     slug = "doctor-" + slugify(doc.get("name", ""))
     filename = f"{slug}.html"
@@ -861,10 +892,10 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
   "@graph": [
     {{
       "@type": "Physician",
-      "name": "{escape(name)}",
-      "medicalSpecialty": "{escape(specialty)}",
+      "name": "{json_escape(name)}",
+      "medicalSpecialty": "{json_escape(specialty)}",
       "url": "{url}",
-      {"\"image\": \"" + escape(photo) + "\"," if photo else ""}
+      {"\"image\": \"" + json_escape(photo) + "\"," if photo else ""}
       "worksFor": {{
         "@type": "Hospital",
         "name": "Ibn Sina Hospital",
@@ -881,14 +912,15 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
       "itemListElement": [
         {{"@type": "ListItem", "position": 1, "name": "Home", "item": "{SITE_URL}/"}},
         {{"@type": "ListItem", "position": 2, "name": "Doctors", "item": "{SITE_URL}/doctors.html"}},
-        {{"@type": "ListItem", "position": 3, "name": "{escape(name)}", "item": "{url}"}}
+        {{"@type": "ListItem", "position": 3, "name": "{json_escape(name)}", "item": "{url}"}}
       ]
     }}
   ]
 }}
 </script>'''
 
-    head = partial_head(title, description, url, image=photo or DEFAULT_IMAGE, extra_jsonld=jsonld).replace("{CSS_PATH}", "../")
+    head = partial_head(title, description, url, image=photo or DEFAULT_IMAGE,
+                        extra_jsonld=jsonld, root="../")
     header = partial_header(active="doctors", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
@@ -944,7 +976,6 @@ def build_doctor_page(doc: dict, dept: dict, related: list) -> tuple:
 
 
 def build_blog_post(post: dict, related: list) -> tuple:
-    """Generate a blog post page. Returns (filename, url, html)."""
     slug = post.get("slug") or slugify(post.get("title", ""))
     filename = f"blog-{slug}.html"
     url = f"{SITE_URL}/blog/{filename}"
@@ -968,7 +999,6 @@ def build_blog_post(post: dict, related: list) -> tuple:
     body = re.sub(r'href="health-checkup-packages\.html"', 'href="../health-checkup-packages.html"', body)
     body = re.sub(r'href="department-pages/', 'href="../department-pages/', body)
 
-    # Format plain text into HTML if needed
     if "<p>" not in body and "<div" not in body and "<ul" not in body:
         body = format_blog_body(body)
 
@@ -986,11 +1016,11 @@ def build_blog_post(post: dict, related: list) -> tuple:
 {{
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "{escape(title)}",
-  "description": "{escape(summary[:160])}",
-  "image": "{escape(image)}",
-  "datePublished": "{escape(published)}",
-  "dateModified": "{escape(published)}",
+  "headline": "{json_escape(title)}",
+  "description": "{json_escape(summary[:160])}",
+  "image": "{json_escape(image)}",
+  "datePublished": "{json_escape(published)}",
+  "dateModified": "{json_escape(published)}",
   "author": {{"@type": "Organization", "name": "Ibn Sina Hospital", "url": "{SITE_URL}/"}},
   "publisher": {{
     "@type": "Organization",
@@ -1001,7 +1031,8 @@ def build_blog_post(post: dict, related: list) -> tuple:
 }}
 </script>'''
 
-    head = partial_head(title, summary[:160], url, image=image, is_article=True, extra_jsonld=jsonld).replace("{CSS_PATH}", "../")
+    head = partial_head(title, summary[:160], url, image=image, is_article=True,
+                        extra_jsonld=jsonld, root="../")
     header = partial_header(active="blog", root="../")
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
@@ -1055,7 +1086,6 @@ def build_blog_post(post: dict, related: list) -> tuple:
 
 
 def format_blog_body(text: str) -> str:
-    """Convert plain text with blank-line separators into HTML."""
     text = re.sub(r"[\u200B-\u200D\u2060\uFEFF]", "", text)
     blocks = re.split(r"\n\s*\n", text)
     out = []
@@ -1116,7 +1146,7 @@ def main():
     gallery_raw = fetch_csv(SHEETS["gallery"])
     updates_raw = fetch_csv(SHEETS["updates"])
 
-    # Normalize blog fields
+    # Normalize blog short summary field name (sheet uses "short summary" with a space)
     for post in blog_raw:
         if "short summary" in post and not post.get("short_summary"):
             post["short_summary"] = post.pop("short summary")
@@ -1125,7 +1155,6 @@ def main():
           f"{len(departments_raw)} departments, {len(gallery_raw)} gallery items, "
           f"{len(updates_raw)} updates")
 
-    # Save JSON for client-side consumers
     Path("data").mkdir(exist_ok=True)
     (Path("data") / "doctors.json").write_text(json.dumps(doctors_raw, ensure_ascii=False), encoding="utf-8")
     (Path("data") / "departments.json").write_text(json.dumps(departments_raw, ensure_ascii=False), encoding="utf-8")
@@ -1181,11 +1210,14 @@ def main():
 
     print("[5/6] Building sitemap…")
     cache = load_lastmod_cache()
+
     static_pages = [f"{SITE_URL}/{p}" if p else f"{SITE_URL}/" for p in STATIC_TOP_LEVEL_PAGES]
-    service_area_urls = [
-        f"{SITE_URL}/service-areas/hospital-in-srinagar.html",
-        f"{SITE_URL}/service-areas/hospital-in-ganderbal.html",
-        f"{SITE_URL}/service-areas/hospital-near-chadoora-beerwah-charar.html",
+    service_area_urls = [f"{SITE_URL}/{p}" for p in SERVICE_AREA_PAGES]
+
+    directory_pages = [
+        f"{SITE_URL}/department-pages/specialties-directory.html",
+        f"{SITE_URL}/department-pages/doctor-directory.html",
+        f"{SITE_URL}/department-pages/jammu-kashmir-healthcare.html",
     ]
 
     all_urls = list(set(
@@ -1194,16 +1226,19 @@ def main():
         + dept_urls
         + doctor_urls
         + blog_urls
-        + [f"{SITE_URL}/department-pages/specialties-directory.html",
-           f"{SITE_URL}/department-pages/doctor-directory.html",
-           f"{SITE_URL}/department-pages/jammu-kashmir-healthcare.html"]
+        + directory_pages
     ))
 
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
 
     for url in sorted(all_urls):
-        priority = "1.0" if url == f"{SITE_URL}/" else ("0.8" if "/doctors/" in url or "/blog/" in url or "/department-pages/" in url else "0.7")
+        if url == f"{SITE_URL}/":
+            priority = "1.0"
+        elif "/doctors/" in url or "/blog/" in url or "/department-pages/" in url:
+            priority = "0.8"
+        else:
+            priority = "0.7"
         lastmod = cache.get(url, {}).get("lastmod", TODAY)
         xml.append(f"  <url><loc>{url}</loc><lastmod>{lastmod}</lastmod>"
                    f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>")
@@ -1212,7 +1247,6 @@ def main():
     Path("sitemap.xml").write_text("\n".join(xml), encoding="utf-8")
     print(f"  → {len(all_urls)} URLs in sitemap")
 
-    # Update lastmod cache
     for url in all_urls:
         if url not in cache:
             cache[url] = {"hash": "", "lastmod": TODAY}
