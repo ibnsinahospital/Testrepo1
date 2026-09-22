@@ -64,13 +64,45 @@ TODAY = datetime.date.today().isoformat()
 DEFAULT_IMAGE = "https://i.ibb.co/NgNyCQgf/8e1694fa3791.webp"
 FAVICON = "https://i.ibb.co/NgNyCQgf/8e1694fa3791.webp"
 
+# ------------------------------------------------------------
+# Precompiled regexes — kept at module level so that we never
+# put a regex with a backslash inside an f-string expression.
+# Python 3.11 forbids backslashes inside f-string {…} blocks.
+# ------------------------------------------------------------
+RE_INVISIBLE_CHARS = re.compile(r"[\u200B-\u200D\u2060\uFEFF]")
+RE_BLANK_LINE      = re.compile(r"\n\s*\n")
+RE_NEWLINE         = re.compile(r"\n")
+RE_BULLET_LINE     = re.compile(r"^[-•*]\s+")
+RE_NUMBER_LINE     = re.compile(r"^\d+[.)]\s+")
+RE_SENTENCE_END    = re.compile(r"[.!?:;,]$")
+RE_UPPER_START     = re.compile(r"^[A-Z]")
+RE_SLUG_STRIP      = re.compile(r"[^a-z0-9]+")
+RE_DR_PREFIX       = re.compile(r"^dr\.?\s*", re.IGNORECASE)
+RE_TRAILING_DOT    = re.compile(r"\.+$")
+RE_HTML_TAG        = re.compile(r"<[^>]+>")
+
+# Blog link rewriters — applied to sheet content that carries root-relative
+# links, when we render blog posts under /blog/.
+BLOG_LINK_REWRITES = [
+    (re.compile(r'href="appointment\.html"'), 'href="../appointment.html"'),
+    (re.compile(r'href="insurance-pmjay\.html"'), 'href="../insurance-pmjay.html"'),
+    (re.compile(r'href="services\.html"'), 'href="../services.html"'),
+    (re.compile(r'href="doctors\.html"'), 'href="../doctors.html"'),
+    (re.compile(r'href="contact\.html"'), 'href="../contact.html"'),
+    (re.compile(r'href="about\.html"'), 'href="../about.html"'),
+    (re.compile(r'href="blog\.html"'), 'href="../blog.html"'),
+    (re.compile(r'href="faq\.html"'), 'href="../faq.html"'),
+    (re.compile(r'href="health-checkup-packages\.html"'), 'href="../health-checkup-packages.html"'),
+    (re.compile(r'href="department-pages/'), 'href="../department-pages/'),
+]
+
 
 # ============================================================
 # HELPERS
 # ============================================================
 def slugify(text: str) -> str:
     text = (text or "").lower()
-    text = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    text = RE_SLUG_STRIP.sub("-", text).strip("-")
     return text
 
 
@@ -79,8 +111,9 @@ def title_case(text: str) -> str:
 
 
 def clean_name(raw_name: str) -> str:
-    name = (raw_name or "").strip().rstrip(".")
-    name = re.sub(r"^dr\.?\s*", "", name, flags=re.IGNORECASE).strip()
+    name = (raw_name or "").strip()
+    name = RE_TRAILING_DOT.sub("", name)
+    name = RE_DR_PREFIX.sub("", name).strip()
     name = " ".join(w.capitalize() for w in name.split())
     return f"Dr. {name}" if name else "Doctor"
 
@@ -90,7 +123,7 @@ def escape(value) -> str:
 
 
 def jsonld_block(data) -> str:
-    """Serialize a Python dict/list to a <script type='application/ld+json'> tag."""
+    """Serialize a Python dict/list into a schema.org <script> block."""
     return (
         '<script type="application/ld+json">'
         + json.dumps(data, ensure_ascii=False, separators=(",", ":"))
@@ -660,6 +693,78 @@ DEPARTMENT_CONTENT = {
 
 
 # ============================================================
+# BLOG BODY FORMATTER — fully de-fanged from f-string backslashes
+# ============================================================
+def format_blog_body(text):
+    """Convert plain text (blank-line separated) into HTML."""
+    text = RE_INVISIBLE_CHARS.sub("", text)
+    blocks = RE_BLANK_LINE.split(text)
+    out = []
+    lead_assigned = False
+
+    for block in blocks:
+        lines = [l.strip() for l in RE_NEWLINE.split(block) if l.strip()]
+        if not lines:
+            continue
+
+        is_bulleted = all(RE_BULLET_LINE.match(l) for l in lines)
+        is_numbered = all(RE_NUMBER_LINE.match(l) for l in lines)
+
+        if is_bulleted:
+            items = "".join(
+                "<li>" + html.escape(RE_BULLET_LINE.sub("", l)) + "</li>"
+                for l in lines
+            )
+            out.append("<ul>" + items + "</ul>")
+
+        elif is_numbered:
+            items = "".join(
+                "<li>" + html.escape(RE_NUMBER_LINE.sub("", l)) + "</li>"
+                for l in lines
+            )
+            out.append("<ol>" + items + "</ol>")
+
+        elif len(lines) == 1:
+            line = lines[0]
+            wc = len(line.split())
+
+            if line.endswith("?") and wc <= 20:
+                out.append('<p class="blog-pull-quote">' + html.escape(line) + "</p>")
+
+            elif wc <= 8 and not RE_SENTENCE_END.search(line) and RE_UPPER_START.match(line):
+                out.append('<h3 class="blog-subheading">' + html.escape(line) + "</h3>")
+
+            else:
+                if not lead_assigned:
+                    out.append('<p class="blog-lead-paragraph">' + html.escape(line) + "</p>")
+                    lead_assigned = True
+                else:
+                    out.append("<p>" + html.escape(line) + "</p>")
+
+        else:
+            para = "<br>".join(html.escape(l) for l in lines)
+            if not lead_assigned:
+                out.append('<p class="blog-lead-paragraph">' + para + "</p>")
+                lead_assigned = True
+            else:
+                out.append("<p>" + para + "</p>")
+
+    return "".join(out)
+
+
+def format_date(value):
+    if not value:
+        return ""
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
+        try:
+            d = datetime.datetime.strptime(value.strip(), fmt)
+            return f"{d.day} {d.strftime('%B')} {d.year}"
+        except (ValueError, AttributeError):
+            continue
+    return value
+
+
+# ============================================================
 # PAGE BUILDERS
 # ============================================================
 def build_department_page(slug, data, doctors_for_dept):
@@ -712,8 +817,8 @@ def build_department_page(slug, data, doctors_for_dept):
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
 
-    treats = "".join(f'<div class="treat-item">{escape(t)}</div>' for t in data["treat"])
-    facilities = "".join(f"<li>{escape(f)}</li>" for f in data["facilities"])
+    treats = "".join('<div class="treat-item">' + escape(t) + "</div>" for t in data["treat"])
+    facilities = "".join("<li>" + escape(f) + "</li>" for f in data["facilities"])
 
     doctors_html = ""
     if doctors_for_dept:
@@ -722,30 +827,32 @@ def build_department_page(slug, data, doctors_for_dept):
             name = clean_name(d.get("name", ""))
             slug_d = "doctor-" + slugify(d.get("name", ""))
             photo = d.get("photo_url") or ""
-            img = (
-                f'<img class="doctor-card-img" src="{escape(photo)}" alt="{escape(name)}" loading="lazy" width="96" height="96">'
-                if photo
-                else '<div class="doctor-card-placeholder">👨‍⚕️</div>'
-            )
+            if photo:
+                img = ('<img class="doctor-card-img" src="' + escape(photo)
+                       + '" alt="' + escape(name)
+                       + '" loading="lazy" width="96" height="96">')
+            else:
+                img = '<div class="doctor-card-placeholder">👨‍⚕️</div>'
             cards.append(
-                f'<a class="doctor-card" href="../doctors/{slug_d}.html">'
-                f"{img}"
-                f"<h3>{escape(name)}</h3>"
-                f'<p class="doctor-card-specialty">{escape(title_case(d.get("specialty", "")))}</p>'
-                f'<p class="doctor-card-qual">{escape(d.get("qualifications", ""))}</p>'
-                f'<span class="btn btn-outline btn-sm">View Profile</span>'
-                f"</a>"
+                '<a class="doctor-card" href="../doctors/' + slug_d + '.html">'
+                + img
+                + "<h3>" + escape(name) + "</h3>"
+                + '<p class="doctor-card-specialty">' + escape(title_case(d.get("specialty", ""))) + "</p>"
+                + '<p class="doctor-card-qual">' + escape(d.get("qualifications", "")) + "</p>"
+                + '<span class="btn btn-outline btn-sm">View Profile</span>'
+                + "</a>"
             )
         doctors_html = (
             '<section class="section-padding section-flush-top">'
             '<div class="container">'
-            f'<h2 class="section-title">Our {escape(data["title"])} Team</h2>'
-            f'<div class="doctor-cards-grid">{"".join(cards)}</div>'
+            '<h2 class="section-title">Our ' + escape(data["title"]) + " Team</h2>"
+            '<div class="doctor-cards-grid">' + "".join(cards) + "</div>"
             "</div></section>"
         )
 
     faqs_html = "".join(
-        f'<details class="faq-item"><summary>{escape(q)}</summary><div class="faq-answer">{escape(a)}</div></details>'
+        '<details class="faq-item"><summary>' + escape(q)
+        + '</summary><div class="faq-answer">' + escape(a) + "</div></details>"
         for q, a in data["faqs"]
     )
 
@@ -755,7 +862,7 @@ def build_department_page(slug, data, doctors_for_dept):
             '<div class="team-note-card">'
             '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
             '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>'
-            f'<p>{escape(data["team_note"])}</p>'
+            "<p>" + escape(data["team_note"]) + "</p>"
             "</div>"
         )
 
@@ -917,23 +1024,39 @@ def build_doctor_page(doc, dept, related):
     footer = partial_footer(root="../")
     scripts = partial_scripts(root="../")
 
-    photo_html = (
-        f'<img class="doctor-profile-photo" src="{escape(photo)}" alt="{escape(name)} — {escape(specialty)}" width="140" height="140">'
-        if photo
-        else '<div class="doctor-profile-photo doctor-card-placeholder" aria-hidden="true">👨‍⚕️</div>'
-    )
+    if photo:
+        photo_html = ('<img class="doctor-profile-photo" src="' + escape(photo)
+                      + '" alt="' + escape(name) + " — " + escape(specialty)
+                      + '" width="140" height="140">')
+    else:
+        photo_html = '<div class="doctor-profile-photo doctor-card-placeholder" aria-hidden="true">👨‍⚕️</div>'
 
     dept_link = ""
     if dept:
-        dept_link = f'<p><a href="../department-pages/{escape(dept["slug"])}.html">View {escape(title_case(dept["name"]))} Department →</a></p>'
+        dept_link = ('<p><a href="../department-pages/' + escape(dept["slug"])
+                     + '.html">View ' + escape(title_case(dept["name"]))
+                     + " Department →</a></p>")
 
     related_html = ""
     if related:
         items = "".join(
-            f'<li><a href="doctor-{slugify(r.get("name",""))}.html">{escape(clean_name(r.get("name","")))} — {escape(title_case(r.get("specialty","")))}</a></li>'
+            '<li><a href="doctor-' + slugify(r.get("name", "")) + '.html">'
+            + escape(clean_name(r.get("name", "")))
+            + " — " + escape(title_case(r.get("specialty", "")))
+            + "</a></li>"
             for r in related[:5]
         )
-        related_html = f'<div class="related-doctors"><strong>Other {escape(department)} Specialists</strong><ul>{items}</ul></div>'
+        related_html = ('<div class="related-doctors"><strong>Other '
+                        + escape(department)
+                        + " Specialists</strong><ul>" + items + "</ul></div>")
+
+    quals_html = ""
+    if qualifications:
+        quals_html = "<span><strong>Qualifications:</strong> " + escape(qualifications) + "</span>"
+
+    about_html = ""
+    if about:
+        about_html = '<div class="doctor-profile-bio">' + escape(about) + "</div>"
 
     return filename, url, f"""{head}
 {header}
@@ -951,12 +1074,12 @@ def build_doctor_page(doc, dept, related):
       <span class="doctor-profile-specialty">{escape(specialty)}</span>
       <div class="doctor-profile-meta">
         <span><strong>Department:</strong> {escape(department)}</span>
-        {f'<span><strong>Qualifications:</strong> {escape(qualifications)}</span>' if qualifications else ''}
+        {quals_html}
       </div>
       {dept_link}
     </header>
 
-    {f'<div class="doctor-profile-bio">{escape(about)}</div>' if about else ''}
+    {about_html}
 
     {related_html}
 
@@ -980,18 +1103,11 @@ def build_blog_post(post, related):
     published = post.get("published_at", "")
     image = post.get("cover_image_url") or DEFAULT_IMAGE
     category = post.get("category", "Health")
-    reading = max(1, math.ceil(len(re.sub(r"<[^>]+>", " ", body).split()) / 200))
+    reading = max(1, math.ceil(len(RE_HTML_TAG.sub(" ", body).split()) / 200))
 
-    body = re.sub(r'href="appointment\.html"', 'href="../appointment.html"', body)
-    body = re.sub(r'href="insurance-pmjay\.html"', 'href="../insurance-pmjay.html"', body)
-    body = re.sub(r'href="services\.html"', 'href="../services.html"', body)
-    body = re.sub(r'href="doctors\.html"', 'href="../doctors.html"', body)
-    body = re.sub(r'href="contact\.html"', 'href="../contact.html"', body)
-    body = re.sub(r'href="about\.html"', 'href="../about.html"', body)
-    body = re.sub(r'href="blog\.html"', 'href="../blog.html"', body)
-    body = re.sub(r'href="faq\.html"', 'href="../faq.html"', body)
-    body = re.sub(r'href="health-checkup-packages\.html"', 'href="../health-checkup-packages.html"', body)
-    body = re.sub(r'href="department-pages/', 'href="../department-pages/', body)
+    # Rewrite root-relative internal links for /blog/ output
+    for pattern, repl in BLOG_LINK_REWRITES:
+        body = pattern.sub(repl, body)
 
     if "<p>" not in body and "<div" not in body and "<ul" not in body:
         body = format_blog_body(body)
@@ -999,10 +1115,13 @@ def build_blog_post(post, related):
     related_html = ""
     if related:
         items = "".join(
-            f'<li><a href="blog-{escape(r.get("slug",""))}.html">{escape(r.get("title",""))}</a></li>'
+            '<li><a href="blog-' + escape(r.get("slug", "")) + '.html">'
+            + escape(r.get("title", ""))
+            + "</a></li>"
             for r in related[:3]
         )
-        related_html = f'<section class="blog-related-articles"><h2>Related Articles</h2><ul>{items}</ul></section>'
+        related_html = ('<section class="blog-related-articles">'
+                        "<h2>Related Articles</h2><ul>" + items + "</ul></section>")
 
     formatted_date = format_date(published)
 
@@ -1081,56 +1200,6 @@ def build_blog_post(post, related):
 {scripts}"""
 
 
-def format_blog_body(text):
-    text = re.sub(r"[\u200B-\u200D\u2060\uFEFF]", "", text)
-    blocks = re.split(r"\n\s*\n", text)
-    out = []
-    lead_assigned = False
-
-    for block in blocks:
-        lines = [l.strip() for l in block.split("\n") if l.strip()]
-        if not lines:
-            continue
-        is_bulleted = all(re.match(r"^[-•*]\s+", l) for l in lines)
-        is_numbered = all(re.match(r"^\d+[.)]\s+", l) for l in lines)
-
-        if is_bulleted:
-            items = "".join(f"<li>{html.escape(re.sub(r'^[-•*]\s+', '', l))}</li>" for l in lines)
-            out.append(f"<ul>{items}</ul>")
-        elif is_numbered:
-            items = "".join(f"<li>{html.escape(re.sub(r'^\d+[.)]\s+', '', l))}</li>" for l in lines)
-            out.append(f"<ol>{items}</ol>")
-        elif len(lines) == 1:
-            line = lines[0]
-            wc = len(line.split())
-            if line.endswith("?") and wc <= 20:
-                out.append(f'<p class="blog-pull-quote">{html.escape(line)}</p>')
-            elif wc <= 8 and not re.search(r"[.!?:;,]$", line) and re.match(r"^[A-Z]", line):
-                out.append(f'<h3 class="blog-subheading">{html.escape(line)}</h3>')
-            else:
-                cls = ' class="blog-lead-paragraph"' if not lead_assigned else ""
-                lead_assigned = True
-                out.append(f"<p{cls}>{html.escape(line)}</p>")
-        else:
-            cls = ' class="blog-lead-paragraph"' if not lead_assigned else ""
-            lead_assigned = True
-            out.append(f"<p{cls}>" + "<br>".join(html.escape(l) for l in lines) + "</p>")
-
-    return "".join(out)
-
-
-def format_date(value):
-    if not value:
-        return ""
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
-        try:
-            d = datetime.datetime.strptime(value.strip(), fmt)
-            return f"{d.day} {d.strftime('%B')} {d.year}"
-        except (ValueError, AttributeError):
-            continue
-    return value
-
-
 # ============================================================
 # MAIN
 # ============================================================
@@ -1166,10 +1235,10 @@ def main():
 
     dept_urls = []
     for slug, content in DEPARTMENT_CONTENT.items():
-        dept_meta = departments_by_slug.get(slug, {})
         dept_doctors = [
             doc for doc in doctors_raw
-            if slugify(doc.get("department", "")) == slug or slugify(doc.get("specialty", "")) == slug
+            if slugify(doc.get("department", "")) == slug
+            or slugify(doc.get("specialty", "")) == slug
         ]
         html_out = build_department_page(slug, content, dept_doctors)
         (Path("department-pages") / f"{slug}.html").write_text(html_out, encoding="utf-8")
@@ -1181,7 +1250,9 @@ def main():
     doctor_urls = []
     for doc in doctors_raw:
         dept_slug = slugify(doc.get("department", ""))
-        dept_meta = departments_by_slug.get(dept_slug, {"slug": dept_slug, "name": doc.get("department", "")})
+        dept_meta = departments_by_slug.get(
+            dept_slug, {"slug": dept_slug, "name": doc.get("department", "")}
+        )
         related = [
             d for d in doctors_raw
             if slugify(d.get("department", "")) == dept_slug
